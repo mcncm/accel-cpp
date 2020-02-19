@@ -1,4 +1,5 @@
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_opengl.h>
 #include <iostream>
 #include "asset_path.h"
 #include "cleanup.h"
@@ -7,8 +8,7 @@
 // Window dimensions
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
-const int FRAME_DUR = 40; // in millis
-
+const int FRAME_DUR = 0; // in millis
 
 /**
  * Log an SDL error with some error message to an output stream
@@ -18,7 +18,6 @@ const int FRAME_DUR = 40; // in millis
 void logSDLError(std::ostream &os, const std::string &msg) {
   os << msg << " error: " << SDL_GetError() << std::endl;
 }
-
 
 /**
  * Loads a BMP image into a texture on the rendering device
@@ -68,10 +67,27 @@ void renderTexture(SDL_Texture *tex, SDL_Renderer *ren, int x, int y) {
  * main function that does stuff
  */
 int main(int argc, char* args[]) {
+
   // Initialize SDL2
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
     logSDLError(std::cout, "SDL_Init");
     return 1;
+  }
+
+  // Set some GL attributes
+  // TODO Are these really the settings I want? Correct major and minor versions, etc?
+  // TODO can I use macros here to make this less verbose?
+  if (SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE)) {
+    logSDLError(std::cout, "SDL_GL_SetAttribute");
+  }
+  if (SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3)) {
+    logSDLError(std::cout, "SDL_GL_SetAttribute");
+  }
+  if (SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2)) {
+    logSDLError(std::cout, "SDL_GL_SetAttribute");
+  }
+  if (SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8)) {
+    logSDLError(std::cout, "SDL_GL_SetAttribute");
   }
 
   // Get the resolution
@@ -82,25 +98,41 @@ int main(int argc, char* args[]) {
   }
 
   // Make a window
-  SDL_Window *win = SDL_CreateWindow("Hello world!", 100, 100,
-                                     dm.w, dm.h, SDL_WINDOW_SHOWN);
+  SDL_Window *win = SDL_CreateWindow("Hello world!", 100, 100, dm.w, dm.h,
+                                     SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
   if (win == nullptr) {
     logSDLError(std::cout, "SDL_CreateWindow");
     SDL_Quit();
     return 1;
   }
 
-  // Make the window fullscreen
-  if (SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN) < 0) {
-    logSDLError(std::cout, "SDL_SetWindowFullscreen");
+#ifndef DEBUG
+  // Make the window fullscreen. Feature-flaged for release only.
+  if (SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN)) {
+      logSDLError(std::cout, "SDL_SetWindowFullscreen");
+    }
+#endif
+
+// Temporarily feature-flagged
+# ifdef DEBUG
+  // Make a GL context
+  SDL_GLContext context = SDL_GL_CreateContext(win);
+  if (context == nullptr) {
+    logSDLError(std::cout, "SDL_GL_CreateContext");
+    cleanup(win);
+    SDL_Quit();
+    return 1;
   }
+#else
+  void* context = nullptr;
+#endif
 
   // Make a renderer, to draw to the window
   SDL_Renderer *ren = SDL_CreateRenderer(win, -1,
                SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
   if (ren == nullptr) {
     logSDLError(std::cout, "SDL_CreateRenderer");
-    cleanup(win);
+    cleanup(win, &context);
     SDL_Quit();
     return 1;
   }
@@ -122,10 +154,10 @@ int main(int argc, char* args[]) {
 
     std::cout << accel_x_raw << ","
               << accel_y_raw << ","
-              << accel_y_raw << ";    "
-              << scale_accel(accel_y_raw) << ","
-              << scale_accel(accel_y_raw) << ","
-              << scale_accel(accel_y_raw) << ","
+              << accel_z_raw << ";    "
+              << (int)scale_accel(accel_x_raw) << ","
+              << (int)scale_accel(accel_y_raw) << ","
+              << (int)scale_accel(accel_z_raw) << ","
               << std::endl;
 
     while (SDL_PollEvent(&e)) {
@@ -142,10 +174,12 @@ int main(int argc, char* args[]) {
         }
       }
 
+#ifndef DEBUG
       // User touches touchscreen
       if (e.type == SDL_FINGERDOWN) {
         std::cout << "Touched!" << std::endl;
       }
+#endif
     }
 
     SDL_RenderClear(ren);
@@ -162,6 +196,6 @@ int main(int argc, char* args[]) {
   }
 
   // Finally, clean everything up.
-  cleanup(ren, win);
+  cleanup(ren, win, &context);
   SDL_Quit();
 }

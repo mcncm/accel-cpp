@@ -51,4 +51,22 @@ inline void cleanup<SDL_Surface>(SDL_Surface *surf) {
   SDL_FreeSurface(surf);
 }
 
+/**
+ * TODO there are two ugly things I could do here: one is to take a pointer to
+ * an SDL_GLContext (i.e. a void**), and to always pass a context as a
+ * reference, breaking the symmetry of the other arguments. Alternatively, I
+ * could replace this instantiation of `cleanup` with a void*. But is this
+ * dangerous? I would want it to work only for an SDL_GLContext, But I think
+ * this would type-check on _any pointer_.
+ *
+ * For the time being I've gone with the first ugly solution.
+ */
+template<>
+inline void cleanup<SDL_GLContext>(SDL_GLContext *context) {
+  if (!context) {
+    return;
+  }
+  SDL_GL_DeleteContext(context);
+}
+
 #endif

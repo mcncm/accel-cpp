@@ -4,8 +4,27 @@
 #include <string>
 #include <SDL2/SDL.h>
 
+static std::string accel_dir = "/sys/bus/iio/devices/iio:device2/";
+
 // TODO what is the "correct" way to do this?
-const int max_accel = 20000;
+/** Invensense MPU-6050
+ * Range and sensitivity
+ * Gyro FSR    Accel FSR (g)    Accel sensitivity (LSB/g)
+ * +- 250      +- 2             16384
+ * +- 500      +- 4             8192
+ * +- 1000     +- 8             4096
+ * +- 2000     +- 16            2048
+ *
+ * Output data rate
+ * Min (Hz)     Max (Hz)
+ * 4            8000
+ *
+ */
+const int lsb_per_g = 16384;
+// +/- maximum acceleration on each axis in g
+const int range_g = 2;
+// +/- maximum acceleration on each axis in native units
+const int max_accel = lsb_per_g * range_g;
 
 /**
  * Read the contents of a file containing a single integer, and
