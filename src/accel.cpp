@@ -6,7 +6,7 @@
 // Window dimensions
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
-const int FRAME_DUR = 40;
+const int FRAME_DUR = 40; // in millis
 
 
 /**
@@ -70,17 +70,29 @@ void renderTexture(SDL_Texture *tex, SDL_Renderer *ren, int x, int y) {
 int main(int argc, char* args[]) {
   // Initialize SDL2
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-    logSDLError(std::cout, "SDL_INIT");
+    logSDLError(std::cout, "SDL_Init");
+    return 1;
+  }
+
+  // Get the resolution
+  SDL_DisplayMode dm;
+  if (SDL_GetCurrentDisplayMode(0, &dm) != 0) {
+    logSDLError(std::cout, "SDL_GetCurrentDisplayMode");
     return 1;
   }
 
   // Make a window
   SDL_Window *win = SDL_CreateWindow("Hello world!", 100, 100,
-               SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+                                     dm.w, dm.h, SDL_WINDOW_SHOWN);
   if (win == nullptr) {
     logSDLError(std::cout, "SDL_CreateWindow");
     SDL_Quit();
     return 1;
+  }
+
+  // Make the window fullscreen
+  if (SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN) < 0) {
+    logSDLError(std::cout, "SDL_SetWindowFullscreen");
   }
 
   // Make a renderer, to draw to the window
@@ -93,39 +105,59 @@ int main(int argc, char* args[]) {
     return 1;
   }
 
-  // Load some test bitmaps
-  std::string backgroundPath = getAssetPath("test_image.bmp");
-  SDL_Texture *background = loadTexture(backgroundPath, ren);
-  if (background == nullptr) {
-    cleanup(background, ren, win);
-    SDL_Quit();
-    return 1;
-  }
-
   // Draw the texture on the screen. Here's a rendering loop.
   SDL_Event e;
   bool quit = false;
+  Uint8 brightness = 0;
+  const Uint8 brightness_inc = 10;
   while (!quit) {
     while (SDL_PollEvent(&e)) {
-      // If user closes the window
+      // User closes the window
       if (e.type == SDL_QUIT) {
         quit = true;
+        std::cout << "Quit!" << std::endl;
       }
 
-      // If user presses any key
+      // User presses a key
       if (e.type == SDL_KEYDOWN) {
-        quit = true;
+        switch(e.key.keysym.sym) {
+          case SDLK_q:
+            quit = true;
+            break;
+          case SDLK_UP:
+            brightness = brightness >= UINT8_MAX - brightness_inc ?
+              UINT8_MAX : brightness + brightness_inc;
+            break;
+          case SDLK_DOWN:
+            brightness = brightness <= brightness_inc ?
+              0 : brightness - brightness_inc;
+            break;
+        }
       }
 
-      // If user clicks the mouse
+      // User touches touchscreen
+      if (e.type == SDL_FINGERDOWN) {
+        std::cout << "Touched!" << std::endl;
+
+        // Increment the brightness, depending on position
+        if (e.tfinger.y > 0.5) {
+          brightness = brightness >= UINT8_MAX - brightness_inc ?
+            UINT8_MAX : brightness + brightness_inc;
+        } else {
+          brightness = brightness <= brightness_inc ?
+            0 : brightness - brightness_inc;
+        }
+      }
+
+      // User clicks the mouse
       if (e.type == SDL_MOUSEBUTTONDOWN) {
-        quit = true;
+        std::cout << "Mouse!" << std::endl;
       }
     }
 
     SDL_RenderClear(ren);
     // Draw the background
-    renderTexture(background, ren, 0, 0);
+    SDL_SetRenderDrawColor(ren, 0, 0, brightness, 0);
     // Update the screen
     SDL_RenderPresent(ren);
     // Idle for a little while
@@ -133,6 +165,6 @@ int main(int argc, char* args[]) {
   }
 
   // Finally, clean everything up.
-  cleanup(background, ren, win);
+  cleanup(ren, win);
   SDL_Quit();
 }

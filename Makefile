@@ -28,8 +28,11 @@ build:
 debug: CXXFLAGS += -DDEBUG -g
 debug: all
 
+release: CXX := -aarch64-unknown-linux-musl-g++
 release: CXXFLAGS += -O2
 release: all
+release:
+	-@patchelf --set-interpreter /lib/ld-musl-aarch64.so.1 $(APP_DIR)/$(TARGET)
 
 clean:
 	-@rm -rvf $(OBJ_DIR)/*
